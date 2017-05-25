@@ -76,11 +76,9 @@ public class Robot2Tetes implements RobotInterface {
 		}
 		if (left != 0){
 			pilot.rotate(-left/10,false);
-			//System.out.println("Left :"+left);
 		}
 		if (right != 0){
 			pilot.rotate(right/10,false);
-			//System.out.println("Right :"+right);
 		}
 		pilot.stop();
     	align();

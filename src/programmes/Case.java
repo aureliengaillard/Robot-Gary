@@ -1,11 +1,11 @@
 package programmes;
 
 public class Case {
-	// Coordonnees
+	// Coordonnees de la case
 	private int x;
 	private int y;
 	
-	// Voisins
+	// Voisins de la case
 	private Case nord;
 	private Case sud;
 	private Case est;
@@ -16,10 +16,10 @@ public class Case {
 	private int h; // valeur de l'heuristique
 	private Case previous; // predecesseur
 	
-	// Case cartographiée
+	// Flag : true si la case est deja cartographée par un robot, false sinon
 	private boolean cartographie;
 	
-	// Constructeurs
+	// Constructeur
 	public Case(int ligne, int colonne) {
 		this.x = ligne;
 		this.y = colonne;
@@ -33,7 +33,7 @@ public class Case {
 		this.cartographie = false;
 	}
 	
-	// Accesseurs
+	// Getters + Setters
 	public Case getNord() {
 		return this.nord;
 	}
@@ -82,14 +82,6 @@ public class Case {
 		return this.h;
 	}
 	
-	public Case getPrevious() {
-		return this.previous;
-	}
-	
-	public boolean isCartographie() {
-		return this.cartographie;
-	}
-	
 	public void setG(int valeur) {
 		this.g = valeur;
 	}
@@ -98,8 +90,16 @@ public class Case {
 		this.h = valeur;
 	}
 	
+	public Case getPrevious() {
+		return this.previous;
+	}
+	
 	public void setPrevious(Case previous) {
 		this.previous = previous;
+	}
+	
+	public boolean isCartographie() {
+		return this.cartographie;
 	}
 	
 	public void setCartographie(boolean carto) {

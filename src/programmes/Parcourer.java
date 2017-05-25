@@ -15,22 +15,38 @@ import lejos.nxt.comm.NXTConnection;
 import lejos.util.Delay;
 
 public class Parcourer {
+	// Codes des messages Bluetooth
+	private static final int POSITIONROBOT = 0;
+	private static final int ORIENTATIONROBOT = 1;
+	private static final int TAILLELABY = 2;
+	private static final int PERSONNE = 3;
+	private static final int FINPERSONNE = 4;
+	private static final int VALEURPERSONNECHOISIE = 6;
+	private static final int DEPART = 7;
+	private static final int MURNORD = 8;
+	private static final int MURSUD = 9;
+	private static final int MUROUEST = 10;
+	private static final int MUREST = 11;
+	private static final int POSITION = 12;
+	private static final int FINPOSITION = 13;
+	
 	// Variable debug
 	public boolean debug = false;
 	
-	// Robot "générique"
+	// Robot "générique", contenant une instance du robot controlé
 	private RobotInterface robot;
 	
 	// Grille + Semaphore
 	private Grille grille;
 	private Semaphore semGrille = new Semaphore(1);
 	
-	// Orientation du robot
+	// Codes d'orientation du robot
 	public static final int NORD = 0;
 	public static final int EST = 1;
 	public static final int SUD = 2;
 	public static final int OUEST = 3;
 	
+	// Orientation du robot
 	private int orientation;
 	
 	// Coordonnées
@@ -44,9 +60,57 @@ public class Parcourer {
 	// Liste des positions des autres robots
 	private List<Case> autresRobots = new LinkedList<Case>();
 	
+	// Attibuts bluetooth + Semaphores d'accès aux Streams
+	private NXTConnection cx;
+	private DataOutputStream out;
+	private Semaphore semOut = new Semaphore(1);
+	private DataInputStream in;
+	private Semaphore semIn = new Semaphore(1);
+	
 	// Constructeur
 	public Parcourer(RobotInterface robot) {
 		this.robot = robot;
+	}
+	
+	// Getters + Setters
+	public DataInputStream getIn() {
+		return this.in;
+	}
+	
+	public Semaphore getSemIn() {
+		return semIn;
+	}
+	
+	public DataOutputStream getOut() {
+		return this.out;
+	}
+	
+	public Grille getGrille() {
+		return this.grille;
+	}
+	
+	public Semaphore getSemGrille() {
+		return this.semGrille;
+	}
+	
+	public List<Case> getAutresRobots() {
+		return this.autresRobots;
+	}
+	
+	public void setContinuer(boolean continuer) {
+		this.continuer = continuer;
+	}
+	
+	public void setOk(boolean ok) {
+		this.ok = ok;
+	}
+
+	public void setNok(boolean nok) {
+		this.nok = nok;
+	}
+	
+	public void setRecalcul(boolean recalcul) {
+		this.recalcul = recalcul;
 	}
 	
 	// Affichage pour demander les infos de base du labyrinthe
@@ -83,6 +147,7 @@ public class Parcourer {
 		}
 	}
 	
+	// Affichage pour demander la direction du robot
 	private int askDirection() {
 		int valeur = NORD;
 		LCD.clear(5);
@@ -170,13 +235,13 @@ public class Parcourer {
 		}
 	}
 	
-	// Avance d'une case	
+	// Avancer d'une case en mettant à jour les coordonnées du robot
 	private void avanceUneCase() {
 		robot.avanceUneCase();
 		miseAJourCoordonnees();
 	}
 	
-	// Pivoter à gauche a 90 degrés
+	// Pivoter à gauche a 90 degrés en mettant à jour l'orientation du robot
 	private void tourneAGauche() {
 		robot.tourneAGauche();
 		if (this.orientation == NORD) {
@@ -186,19 +251,19 @@ public class Parcourer {
 		}
 	}
 	
-	// Pivoter a droite a 90 degrés
+	// Pivoter a droite a 90 degrés en mettant à jour l'orientation du robot
 	private void tourneADroite() {
 		robot.tourneADroite();
 		this.orientation = (this.orientation + 1) % 4;
 	}
 	
-	// Demi tour
+	// Demi tour en mettant à jour l'orientation du robot
 	private void tourneDemiTour() {
 		robot.tourneDemiTour();
 		this.orientation = (this.orientation + 2) % 4;
 	}
 	
-	// Orienter le robot
+	// Orienter le robot dans la direction souhaitée en fonction de l'orientation actuelle
 	private void orienter(int direction) {
 		switch (this.orientation) {
 			case NORD :
@@ -296,166 +361,59 @@ public class Parcourer {
 		}
 	}
 	
-	// IA de base
-	public void parcoursBasique() {
-		if (debug)
-			LCD.drawString("ParcoursBasique", 0, 0);
-		this.orientation = askDirection();
-		this.x = ask("Depart : x =", 0, 15);
-		this.y = ask("Depart : y =", 0, 15);
-		this.xBut = ask("But : x = ", 0, 15);
-		this.yBut = ask("But : y =", 0, 15);
-		grille = new Grille(ask("Taille laby : x =", 0, 15), ask("Taille laby : y =", 0, 15));
-		LCD.drawString("Press button", 0, 1);
-		Button.waitForAnyPress();
-		LCD.clear(1);
-		while (true) {
-			if ((this.x == this.xBut) && (this.y == this.yBut)) {
-				int notes[] = {500, 600, 700, 800, 900, 1500};
-				this.playSound(Sound.XYLOPHONE, notes, 100);
-				break;
-			}
-			while (!regardeToutDroit()) {
-				avanceUneCase();
-			}
-			if (!this.regardeAGauche()) {
-				this.tourneAGauche();
-			} else if (!this.regardeADroite()) {
-				this.tourneADroite();
-			} else {
-				this.tourneDemiTour();
-			}
-			Delay.msDelay(10);
-		}
+	// Affichage de la grille sur l'écran du robot
+	public void afficherGrille() {
+		LCD.clear();
+		this.grille.afficherGrille();
 	}
 	
-	// IA - Toujours un mur a droite
-	public void parcoursMurADroite() {
-		if (debug)
-			LCD.drawString("ParcoursBasique", 0, 0);
-		this.orientation = askDirection();
-		this.x = ask("Depart : x =", 0, 15);
-		this.y = ask("Depart : y =", 0, 15);
-		this.xBut = ask("But : x = ", 0, 15);
-		this.yBut = ask("But : y =", 0, 15);
-		grille = new Grille(ask("Taille laby : x =", 0, 15), ask("Taille laby : y =", 0, 15));
-		LCD.drawString("Press button", 0, 1);
-		Button.waitForAnyPress();
-		LCD.clear(1);
-		while (true) {
-			if ((this.x == this.xBut) && (this.y == this.yBut)) {
-				int notes[] = {500, 600, 700, 800, 900, 1500};
-				this.playSound(Sound.XYLOPHONE, notes, 100);
-				break;
-			}
-			if (this.regardeADroite()) {
-				if (this.regardeToutDroit()) {
-					if (this.regardeAGauche()) {
-						this.tourneDemiTour();
-						this.avanceUneCase();
-					} else {
-						this.tourneAGauche();
-						this.avanceUneCase();
-					}
-				} else {
-					this.avanceUneCase();
-				}
-			} else {
-				this.tourneADroite();
-				this.avanceUneCase();
-			}
-		}
-	}
+	//// Fonctions pour le D* Lite et l'IA Sauvetage
 	
-	// Parcours de pledge
-	public void parcoursPledge() {
-		if (debug)
-			LCD.drawString("ParcoursPledge", 0, 0);
-		this.orientation = askDirection();
-		this.x = ask("Depart : x =", 0, 15);
-		this.y = ask("Depart : y =", 0, 15);
-		this.xBut = ask("But : x = ", 0, 15);
-		this.yBut = ask("But : y =", 0, 15);
-		grille = new Grille(ask("Taille laby : x =", 0, 15), ask("Taille laby : y =", 0, 15));
-		LCD.drawString("Press button", 0, 1);
-		Button.waitForAnyPress();
-		LCD.clear(1);
-		int valeur = 0;
-		while (true) {
-			if ((this.x == this.xBut) && (this.y == this.yBut)) {
-				int notes[] = {500, 600, 700, 800, 900, 1500};
-				this.playSound(Sound.XYLOPHONE, notes, 100);
-				break;
-			}
-			if (valeur == 0) {
-				while (!regardeToutDroit()) {
-					avanceUneCase();
-				}
-				tourneADroite();
-				valeur--;
-			} else {
-				if (!regardeToutDroit()) {
-					avanceUneCase();
-				}
-				if (!regardeAGauche()) {
-					tourneAGauche();
-					valeur++;
-				} else {
-					if (regardeToutDroit()) {
-						tourneADroite();
-						valeur--;
-					}
-				}
-			}
-			Delay.msDelay(10);
-		}
-	}
-
-	// Mise a jour des murs pendant le parcours
+	// Mise a jour des murs dans la grille pendant le parcours
 	private void murNord() {
 		murNord(this.x, this.y);
 	}
-	
+		
 	public void murNord(int xCase, int yCase) {
 		if (this.grille.getCase(xCase, yCase).getNord() != null) {
 			this.grille.getCase(xCase, yCase).getNord().setSud(null);
 			this.grille.getCase(xCase, yCase).setNord(null);
 		}
 	}
-	
+		
 	private void murEst() {
 		murEst(this.x, this.y);
 	}
-	
+		
 	public void murEst(int xCase, int yCase) {
 		if (this.grille.getCase(xCase, yCase).getEst() != null) {
 			this.grille.getCase(xCase, yCase).getEst().setOuest(null);
 			this.grille.getCase(xCase, yCase).setEst(null);
 		}
 	}
-	
+		
 	private void murOuest() {
 		murOuest(this.x, this.y);
 	}
-	
+		
 	public void murOuest(int xCase, int yCase) {
 		if (this.grille.getCase(xCase, yCase).getOuest() != null) {
 			this.grille.getCase(xCase, yCase).getOuest().setEst(null);
 			this.grille.getCase(xCase, yCase).setOuest(null);
 		}
 	}
-	
+		
 	private void murSud() {
 		murSud(this.x, this.y);
 	}
-	
+		
 	public void murSud(int xCase, int yCase) {
 		if (this.grille.getCase(xCase, yCase).getSud() != null) {
 			this.grille.getCase(xCase, yCase).getSud().setNord(null);
 			this.grille.getCase(xCase, yCase).setSud(null);
 		}
 	}
-
+	
 	// Cartographie autour d'une case
 	private void cartographierAutour() {
 		switch (orientation) {
@@ -503,12 +461,13 @@ public class Parcourer {
 					murEst();
 				}
 				break;
-			default :
+			default : {
 				break;
+			}
 		}
 	}
-	
-	// Pour sauver les gens
+		
+	// Cartogeaphier autour d'une case avec semaphore et envoi aux autres robots
 	private void cartographierAutourConnecte() {
 		switch (orientation) {
 			case NORD :
@@ -557,7 +516,6 @@ public class Parcourer {
 					murEst();
 					this.semGrille.release();
 					this.send(MUREST, this.x, this.y);
-					
 				}
 				if (regardeADroite()) {
 					this.semGrille.acquire();
@@ -592,11 +550,12 @@ public class Parcourer {
 					this.send(MUREST, this.x, this.y);
 				}
 				break;
-			default :
+			default : {
 				break;
+			}
 		}
 	}
-	
+		
 	// Aller a une case voisine
 	private void allerCaseVoisine(Case voisine) {
 		Case current = this.grille.getCase(x, y);
@@ -612,9 +571,9 @@ public class Parcourer {
 			System.out.println("Err-allerCaseVoisine");
 		}
 		this.avanceUneCase();
-	}
-	
-	// Version bluetooth
+	}	
+
+	// Aller a une case voisine en prevenant les autres robots
 	private void allerCaseVoisineConnecte(Case voisine) {
 		Case current = this.grille.getCase(x, y);
 		if (voisine == current.getNord()) {
@@ -635,7 +594,7 @@ public class Parcourer {
 		this.send(FINPOSITION, xtmp, ytmp);
 	}
 	
-	// Possible d'accéder a la prochaine case
+	// Possible d'accéder a la prochaine case ?
 	private boolean canAccess(Case prochaine) {
 		List<Case> voisins = new LinkedList<Case>();
 		Case current = grille.getCase(x, y);
@@ -653,8 +612,157 @@ public class Parcourer {
 		}
 		return voisins.contains(prochaine);
 	}
+	
+	// Envoi d'un message composé de 3 entiers
+	private void send(int codeAEnvoyer, int xAEnvoyer, int yAEnvoyer) {
+		semOut.acquire();
+		try {
+			out.writeInt(codeAEnvoyer);
+			out.flush();
+			out.writeInt(xAEnvoyer);
+			out.flush();
+			out.writeInt(yAEnvoyer);
+			out.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		semOut.release();
+	}
+	
+	
+	
+	////// INTELLIGENCES ARTIFICIELLES //////
+	
+	
+	//// IA de base
+	// Tout droit
+	// Si impossible gauche
+	// Si impossible droite
+	// Si impossible demi tour
+	public void parcoursBasique() {
+		if (debug)
+			LCD.drawString("ParcoursBasique", 0, 0);
+		this.orientation = askDirection();
+		this.x = ask("Depart : x =", 0, 15);
+		this.y = ask("Depart : y =", 0, 15);
+		this.xBut = ask("But : x = ", 0, 15);
+		this.yBut = ask("But : y =", 0, 15);
+		grille = new Grille(ask("Taille laby : x =", 0, 15), ask("Taille laby : y =", 0, 15));
+		LCD.drawString("Press button", 0, 1);
+		Button.waitForAnyPress();
+		LCD.clear(1);
+		while (true) {
+			if ((this.x == this.xBut) && (this.y == this.yBut)) {
+				int notes[] = {500, 600, 700, 800, 900, 1500};
+				this.playSound(Sound.XYLOPHONE, notes, 100);
+				break;
+			}
+			while (!regardeToutDroit()) {
+				avanceUneCase();
+			}
+			if (!this.regardeAGauche()) {
+				this.tourneAGauche();
+			} else if (!this.regardeADroite()) {
+				this.tourneADroite();
+			} else {
+				this.tourneDemiTour();
+			}
+			Delay.msDelay(10);
+		}
+	}
+	
+	//// IA Toujours un mur a droite
+	// Le robot avance en gardant toujours un mur sur sa droite
+	public void parcoursMurADroite() {
+		if (debug)
+			LCD.drawString("ParcoursMurADroite", 0, 0);
+		this.orientation = askDirection();
+		this.x = ask("Depart : x =", 0, 15);
+		this.y = ask("Depart : y =", 0, 15);
+		this.xBut = ask("But : x = ", 0, 15);
+		this.yBut = ask("But : y =", 0, 15);
+		grille = new Grille(ask("Taille laby : x =", 0, 15), ask("Taille laby : y =", 0, 15));
+		LCD.drawString("Press button", 0, 1);
+		Button.waitForAnyPress();
+		LCD.clear(1);
+		while (true) {
+			if ((this.x == this.xBut) && (this.y == this.yBut)) {
+				int notes[] = {500, 600, 700, 800, 900, 1500};
+				this.playSound(Sound.XYLOPHONE, notes, 100);
+				break;
+			}
+			if (this.regardeADroite()) {
+				if (this.regardeToutDroit()) {
+					if (this.regardeAGauche()) {
+						this.tourneDemiTour();
+						this.avanceUneCase();
+					} else {
+						this.tourneAGauche();
+						this.avanceUneCase();
+					}
+				} else {
+					this.avanceUneCase();
+				}
+			} else {
+				this.tourneADroite();
+				this.avanceUneCase();
+			}
+		}
+	}
+	
+	//// IA Parcours de pledge
+	// Meme principe que precedemment (mur à gauche) mais avec un compteur
+	// Si compteur == 0, on continue jusqu'à un mur avant de reprendre mur à gauche
+	// Tourner à droite : compteur--
+	// Tourner à gauche : compteur++
+	public void parcoursPledge() {
+		if (debug)
+			LCD.drawString("ParcoursPledge", 0, 0);
+		this.orientation = askDirection();
+		this.x = ask("Depart : x =", 0, 15);
+		this.y = ask("Depart : y =", 0, 15);
+		this.xBut = ask("But : x = ", 0, 15);
+		this.yBut = ask("But : y =", 0, 15);
+		grille = new Grille(ask("Taille laby : x =", 0, 15), ask("Taille laby : y =", 0, 15));
+		LCD.drawString("Press button", 0, 1);
+		Button.waitForAnyPress();
+		LCD.clear(1);
+		int valeur = 0;
+		while (true) {
+			if ((this.x == this.xBut) && (this.y == this.yBut)) {
+				int notes[] = {500, 600, 700, 800, 900, 1500};
+				this.playSound(Sound.XYLOPHONE, notes, 100);
+				break;
+			}
+			if (valeur == 0) {
+				while (!regardeToutDroit()) {
+					avanceUneCase();
+				}
+				tourneADroite();
+				valeur--;
+			} else {
+				if (!regardeToutDroit()) {
+					avanceUneCase();
+				}
+				if (!regardeAGauche()) {
+					tourneAGauche();
+					valeur++;
+				} else {
+					if (regardeToutDroit()) {
+						tourneADroite();
+						valeur--;
+					}
+				}
+			}
+			Delay.msDelay(10);
+		}
+	}
 
-	// IA - D* lite
+	//// IA D* Lite
+	// Labyrinthe inconnu
+	// Utilisation du A*
+	// On suit le chemin en cartographiant
+	// Si bloqué, recalcul A* aven les murs connus
 	public void parcoursDEtoileLite() {
 		if (debug)
 			LCD.drawString("parcoursD*Lite", 0, 0);
@@ -696,93 +804,9 @@ public class Parcourer {
 		}
 	}
 	
-	public void afficherGrille() {
-		LCD.clear();
-		this.grille.afficherGrille();
-	}
-	
-	// Attibuts bluetooth
-	private NXTConnection cx;
-	private DataOutputStream out;
-	private Semaphore semOut = new Semaphore(1);
-	private DataInputStream in;
-	private Semaphore semIn = new Semaphore(1);
-	
-	// Getters
-	public DataInputStream getIn() {
-		return this.in;
-	}
-	
-	public DataOutputStream getOut() {
-		return this.out;
-	}
-	
-	public Grille getGrille() {
-		return this.grille;
-	}
-	
-	public List<Case> getAutresRobots() {
-		return this.autresRobots;
-	}
-	
-	public Semaphore getSemGrille() {
-		return this.semGrille;
-	}
-	public void setContinuer(boolean continuer) {
-		this.continuer = continuer;
-	}
-	
-	public void setOk(boolean ok) {
-		this.ok = ok;
-	}
-
-	public void setNok(boolean nok) {
-		this.nok = nok;
-	}
-	
-	public void setRecalcul(boolean recalcul) {
-		this.recalcul = recalcul;
-	}
-	
-	public Semaphore getSemIn() {
-		return semIn;
-	}
-
-	private void send(int codeAEnvoyer, int xAEnvoyer, int yAEnvoyer) {
-		semOut.acquire();
-		try {
-			out.writeInt(codeAEnvoyer);
-			out.flush();
-			out.writeInt(xAEnvoyer);
-			out.flush();
-			out.writeInt(yAEnvoyer);
-			out.flush();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		semOut.release();
-	}
-	
-	// Codes des messages bluetooth
-	private static final int POSITIONROBOT = 0;
-	private static final int ORIENTATIONROBOT = 1;
-	private static final int TAILLELABY = 2;
-	private static final int PERSONNE = 3;
-	private static final int FINPERSONNE = 4;
-	private static final int VALEURPERSONNECHOISIE = 6;
-	private static final int DEPART = 7;
-	private static final int MURNORD = 8;
-	private static final int MURSUD = 9;
-	private static final int MUROUEST = 10;
-	private static final int MUREST = 11;
-	private static final int POSITION = 12;
-	private static final int FINPOSITION = 13;
-	private static final int OK = 14;
-	private static final int NOK = 15;
-	private static final int FIN = 16;
-	
+	//// Attributs spécifiques pour l'IA "Sauvetage"
 	// Thread de reception d'informations
-	private ThreadReception thread;
+	private ThreadReceptionRobot thread;
 	
 	// Fin du sauvetage
 	private boolean continuer = true;
@@ -794,18 +818,25 @@ public class Parcourer {
 	private boolean ok = true;
 	private boolean nok = false;
 
+	//// IA "Sauvetage"
+	// Le robot se connecte
+	// Il va chercher des personnes dans une liste
+	// Il communique avec ses semblables via un bloc cental
+	// Il revient dans un coin du labyrinthe une fois tout le monde sauvé
 	public void sauverLesGens() {
+		// Attente de l'initialisation de la connexion des autres robots
 		LCD.drawString("Attente de connexion", 0, 0);
 		cx = Bluetooth.waitForConnection();
 		out = cx.openDataOutputStream();
 		in = cx.openDataInputStream();
 		LCD.clear();
 		LCD.drawString("Connecte !", 0, 0);
+		// Initialisation des données reçues à 0
 		int codeRecu = -1;
 		int xRecu = -1;
 		int yRecu = -1;
 		
-		// Reception position robot
+		// Reception de la position de départ du robot
 		semIn.acquire();
 		try {
 			codeRecu = in.readInt();
@@ -820,7 +851,7 @@ public class Parcourer {
 		}
 		semIn.release();
 		
-		// Reception orientation du robot
+		// Reception de l'orientation de départ du robot
 		semIn.acquire();
 		try {
 			codeRecu = in.readInt();
@@ -848,7 +879,7 @@ public class Parcourer {
 		}
 		semIn.release();
 		
-		// Reception des personnes à sauver
+		// Reception des personnes à sauver (toute la liste)
 		List<Personne> personnesASauver = new LinkedList<Personne>();
 		do {
 			semIn.acquire();
@@ -865,7 +896,7 @@ public class Parcourer {
 			semIn.release();
 		} while (codeRecu != FINPERSONNE);
 		
-		// Signal de départ
+		// Attente du signal de départ de la part du boitier central
 		do {
 			semIn.acquire();
 			try {
@@ -878,15 +909,17 @@ public class Parcourer {
 			semIn.release();
 		} while (codeRecu != DEPART);
 		
-		// Determination des valeurs des personnes a sauver, et envoi
+		// Determination des valeurs des heuristiques pour toutes les personnes a sauver
+		// Envoi de ces valeurs au bloc central
 		for (Personne p : personnesASauver) {
 			List<Case> tmp = this.grille.aEtoile(this.grille.getCase(this.x, this.y), this.grille.getCase(p.getX(), p.getY()));
 			this.send(PERSONNE, p.getX(), p.getY());
 			this.send(VALEURPERSONNECHOISIE, tmp.size(), 0);
 		}
+		// On indique au bloc que c'est la fin de l'envoi de la liste
 		this.send(FINPERSONNE, 0, 0);
 
-		// Reception de la première personne à sauver
+		// Reception de la première personne à sauver, déterminée par le bloc central (en fonction des autres robots)
 		Personne sauv = null;
 		semIn.acquire();
 		try {
@@ -908,16 +941,21 @@ public class Parcourer {
 		this.yBut = new Integer(sauv.getY());
 		semIn.release();
 		
-		// Lancement du thread
-		thread = new ThreadReception(this);
+		// Lancement du thread de reception des informations Bluetooth
+		thread = new ThreadReceptionRobot(this);
 		thread.setDaemon(true);
 		thread.start();
 		thread.demarrer();
 			
+		// Au premier passage on scanne aussi derriere le robot
 		boolean premiereCase = true;
 		
-		// D*
+		// D* pour aller sauver la première personne
 		while (continuer) {
+			// Verification que la personne est "sauvable"
+			// Premier passage -> Sauvable
+			// Autres passages -> Attente de confirmation du bloc central
+			// Si nok, determination d'une autre personne, avec confirmation du bloc central
 			while (!ok && !nok);
 			if (nok) {
 				while (true) {
@@ -950,6 +988,7 @@ public class Parcourer {
 					nok = false;
 				}
 			}
+			// Si fin du sauvetage, on sort de la boucle
 			if (!continuer) {
 				break;
 			}
@@ -957,6 +996,7 @@ public class Parcourer {
 			nok = false;
 			LCD.clear();
 			LCD.drawString("But=(" + this.xBut + ", " + this.yBut + ")", 0, 0);
+			// Scan tout autour, puis on met à false, pour les prochains sauvetages (pas besoin de scanner derriere)
 			if (premiereCase) {
 				this.cartographierAutourConnecte();
 				this.tourneADroite();
@@ -964,10 +1004,10 @@ public class Parcourer {
 				premiereCase = false;
 			}
 			List<Case> cheminPlusCourt = this.grille.aEtoile(this.x, this.y, this.xBut, this.yBut);
-			this.grille.getCase(x, y).setCartographie(true);;
+			this.grille.getCase(x, y).setCartographie(true);
+			// Suivi du chemin le plus court
 			while (!cheminPlusCourt.isEmpty()) {
 				Case prochaine = cheminPlusCourt.get(0);
-				
 				cheminPlusCourt.remove(0);
 				if (this.canAccess(prochaine)) {
 					allerCaseVoisineConnecte(prochaine);
@@ -978,6 +1018,7 @@ public class Parcourer {
 				} else {
 					cheminPlusCourt = this.grille.aEtoile(this.x, this.y, this.xBut, this.yBut);
 				}
+				// Recalcul du chemin, si un autre robot a transmit un mur
 				if (recalcul) {
 					recalcul = false;
 					semGrille.acquire();
@@ -988,16 +1029,21 @@ public class Parcourer {
 				}
 			}
 			if ((this.x == this.xBut) && (this.y == this.yBut)) {
+				// Atteinte du but
 				int notes[] = {500, 600, 700, 800, 900, 1500};
 				this.playSound(Sound.XYLOPHONE, notes, 100);
 				personnesASauver.remove(sauv);
 			} else {
+				// But inaccessible
 				int notes[] = {1000, 900, 800, 700, 600, 500};
 				this.playSound(Sound.PIANO, notes, 500);
 			}
+			// Si plus personne à sauver, sortie de la boucle
 			if (personnesASauver.isEmpty()) {
 				break;
 			}
+			
+			// Determination d'une nouvelle personne à sauver, et envoi au bloc central pour demander sa validation
 			Personne meilleure = personnesASauver.get(0);
 			int meilleureValeur = grille.aEtoile(grille.getCase(this.x, this.y), grille.getCase(meilleure.getX(), meilleure.getY())).size();
 			for (Personne p : personnesASauver) {
@@ -1013,6 +1059,7 @@ public class Parcourer {
 			this.send(PERSONNE, this.xBut, this.yBut);
 		}
 		
+		// Liste des coins
 		List<Case> coins = new LinkedList<Case>();
 		coins.add(grille.getCase(0, 0));
 		coins.add(grille.getCase(0, (grille.getY() - 1)));
@@ -1020,6 +1067,7 @@ public class Parcourer {
 		coins.add(grille.getCase((grille.getX() - 1), (grille.getY() - 1)));
 		boolean continuar = true;
 		while (continuar) {
+			// On determine le meilleur coin (le plus proche, et on y va
 			Case meilleurCoin = coins.get(0);
 			int meilleurCoinVal = grille.aEtoile(grille.getCase(this.x, this.y), meilleurCoin).size();
 			for (int i = 1; i < coins.size(); i++) {
@@ -1033,10 +1081,8 @@ public class Parcourer {
 			this.xBut = meilleurCoin.getX();
 			this.yBut = meilleurCoin.getY();
 			List<Case> cheminPlusCourt = this.grille.aEtoile(this.x, this.y, this.xBut, this.yBut);
-			// ?? this.grille.getCase(x, y).setCartographie(true);
 			while (!cheminPlusCourt.isEmpty()) {
 				Case prochaine = cheminPlusCourt.get(0);
-				
 				cheminPlusCourt.remove(0);
 				if (this.canAccess(prochaine)) {
 					allerCaseVoisineConnecte(prochaine);
@@ -1047,6 +1093,7 @@ public class Parcourer {
 				} else {
 					cheminPlusCourt = this.grille.aEtoile(this.x, this.y, this.xBut, this.yBut);
 				}
+				// Recalcul si un autre robot transmet un mur
 				if (recalcul) {
 					recalcul = false;
 					semGrille.acquire();
@@ -1055,21 +1102,22 @@ public class Parcourer {
 				}
 			}
 			if ((this.x == this.xBut) && (this.y == this.yBut)) {
+				// Coin accessible fin
 				int notes[] = {500, 600, 700, 800, 900, 1500};
 				this.playSound(Sound.XYLOPHONE, notes, 100);
 				continuar = false;
 			} else {
+				// Coin inaccessible :  on se dirige vers un autre coin
 				int notes[] = {1000, 900, 800, 700, 600, 500};
 				this.playSound(Sound.PIANO, notes, 500);
 				coins.remove(meilleurCoin);
 			}
 		}
-		LCD.clear();
-		LCD.drawString("End", 1, 1);
+		
 		LCD.clear();
 		afficherGrille();
 		Button.waitForAnyPress();
-		
-		// TODO Tenir compte des autres robots
 	}
+
+	// TODO Reste à faire : Tenir compte des positions des autres robots dans l'IA "Sauvetage"
 }

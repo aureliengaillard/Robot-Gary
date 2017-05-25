@@ -1,11 +1,9 @@
 package blocCentral;
 
 import java.io.IOException;
-
-import lejos.nxt.LCD;
 import lejos.util.Delay;
 
-public class ThreadReceptionRobot extends Thread {
+public class ThreadReceptionBlocCentral extends Thread {
 	// Bloc d'origine et robot écouté
 	private BlocCentral bloc;
 	private Robot robot;
@@ -14,9 +12,19 @@ public class ThreadReceptionRobot extends Thread {
 	private volatile boolean continueThread = false;
 
 	// Constructeur
-	public ThreadReceptionRobot(BlocCentral origine, Robot robot) {
+	public ThreadReceptionBlocCentral(BlocCentral origine, Robot robot) {
 		this.bloc = origine;
 		this.robot = robot;
+	}
+	
+	// Arret du thread
+	public void arreter() {
+		this.continueThread = false;
+	}
+
+	// Demarrage du thread
+	public void demarrer() {
+		this.continueThread = true;
 	}
 	
 	// Envoi aux autres threads
@@ -28,24 +36,22 @@ public class ThreadReceptionRobot extends Thread {
 		}
 	}
 	
-	// Code Bluetooth
+	// Codes Bluetooth
 	private static final int PERSONNE = 3;
-	private static final int MURNORD = 8;
-	private static final int MURSUD = 9;
-	private static final int MUROUEST = 10;
-	private static final int MUREST = 11;
-	private static final int POSITION = 12;
-	private static final int FINPOSITION = 13;
 	private static final int OK = 14;
 	private static final int NOK = 15;
 	private static final int FIN = 16;
 
 	public void run() {
+		// Données reçues initialisées à -1
 		int codeRecu = -1;
 		int xRecu = -1;
 		int yRecu = -1;
+		// Boucle infinie de reception
 		while (true) {
+			// Thread arrêté ou démarré ?
 			if (continueThread) {
+				// Reception de données
 				try {
 					codeRecu = robot.getIn().readInt();
 					xRecu = robot.getIn().readInt();
@@ -53,7 +59,10 @@ public class ThreadReceptionRobot extends Thread {
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
+				// Traitement différenc, selon ce que l'on reçoit
 				switch (codeRecu) {
+					// Si c'est une personne, on vérifie qu'elle est "sauvable", et on répond au robot
+					// Si sauvable, on la supprime de la liste des personnes
 					case PERSONNE : {
 						bloc.getOccupe().acquire();
 						boolean found = false;
@@ -76,6 +85,7 @@ public class ThreadReceptionRobot extends Thread {
 						bloc.getOccupe().release();
 						break;
 					}
+					// Dans tous les autres cas, on relai l'information aux autres robots
 					default : {
 						sendToOther(codeRecu, xRecu, yRecu);
 						break;
@@ -84,13 +94,5 @@ public class ThreadReceptionRobot extends Thread {
 			}
 			Delay.msDelay(200);
 		}
-	}
-
-	public void arreter() {
-		this.continueThread = false;
-	}
-
-	public void demarrer() {
-		this.continueThread = true;
 	}
 }

@@ -15,29 +15,27 @@ import lejos.util.Delay;
 
 public class BlocCentral {
 	// Liste des robots connectés
-	private List<Robot> robotsConnectes;
+	private List<Robot> robotsConnectes = new LinkedList<Robot>();
 
-	// Liste des personnes a sauver + flag
-	private List<Personne> personnesASauver;
+	// Liste des personnes a sauver + semaphore
+	private List<Personne> personnesASauver = new LinkedList<Personne>();
 	private Semaphore occupe = new Semaphore(1);
 
 	// Taille du labyrinthe
 	private int x;
 	private int y;
 	
-	// Liste des threads d'écoute + getter
-	private List<ThreadReceptionRobot> threads = new LinkedList<ThreadReceptionRobot>();
+	// Liste des threads d'écoute
+	private List<ThreadReceptionBlocCentral> threads = new LinkedList<ThreadReceptionBlocCentral>();
 
 	// Constructeur
 	public BlocCentral() {
-		this.robotsConnectes = new LinkedList<Robot>();
-		this.personnesASauver = new LinkedList<Personne>();
 		this.x = ask("Taille laby : x", 0, 15);
 		this.y = ask("Taille laby : y", 0, 15);
 	}
 	
 	// Getters
-	public List<ThreadReceptionRobot> getThreads() {
+	public List<ThreadReceptionBlocCentral> getThreads() {
 		return this.threads;
 	}
 	
@@ -171,13 +169,12 @@ public class BlocCentral {
 		
 	}
 	
-	private void triBulleOptimise(List<Personne> liste) {
+	private void triBulle(List<Personne> liste) {
 		int longueur = liste.size();
 		boolean inversion;
 
 		do {
 			inversion = false;
-
 			for (int i = 0; i < longueur - 1; i++) {
 				if (liste.get(i).superiorTo(liste.get(i + 1))) {
 					echanger(liste, i, i + 1);
@@ -196,23 +193,17 @@ public class BlocCentral {
 	private static final int FINPERSONNE = 4;
 	private static final int VALEURPERSONNECHOISIE = 6;
 	private static final int DEPART = 7;
-	private static final int MURNORD = 8;
-	private static final int MURSUD = 9;
-	private static final int MUROUEST = 10;
-	private static final int MUREST = 11;
-	private static final int POSITION = 12;
-	private static final int FINPOSITION = 13;
-	private static final int OK = 14;
-	private static final int NOK = 15;
-	private static final int FIN = 16;
 
 	public void run() {
+		// Determination des personnes par l'utilisateur
 		int nbPersonnes = ask("Nb personnes = ", 1, 99);
 		for (int i = 0; i < nbPersonnes; i++) {
 			personnesASauver
 					.add(new Personne(ask("personne " + i + " : x", 0, this.x), ask("personne " + i + " : y", 0, this.y)));
 		}
 		
+		// Connexion à tous les robots pairés avec le bloc central
+		// Paramètres determinés, et envoyés aux robots
 		for (RemoteDevice rd : Bluetooth.getKnownDevicesList()) {
 			String nom = rd.getFriendlyName(false);
 			LCD.drawString("Allumer " + nom, 0, 0);
@@ -252,14 +243,17 @@ public class BlocCentral {
 			r.send(DEPART, 0, 0);
 		}
 		
-		// Valeurs recues
+		// Valeurs recues initialisées à -1
 		int codeRecu = -1;
 		int xRecu = -1;
 		int yRecu = -1;
 		
-		// Reception des valeurs des robots
+		// Reception des valeurs des robots pour les personnes
+		// Chaque personne de la liste reçoit une valeur (distance mini d'un robot)
+		// et un robot (robot le plus proche
 		for (Robot r : robotsConnectes) {
 			do {
+				// Reception de la personne
 				try {
 					codeRecu = r.getIn().readInt();
 					xRecu = r.getIn().readInt();
@@ -268,8 +262,10 @@ public class BlocCentral {
 					e.printStackTrace();
 				}
 				if (codeRecu == PERSONNE) {
+					// Recherche de la personne dans la liste
 					for (Personne p : personnesASauver) {
 						if (p.getX() == xRecu && p.getY() == yRecu) {
+							// Reception de sa valeur
 							try {
 								codeRecu = r.getIn().readInt();
 								xRecu = r.getIn().readInt();
@@ -278,6 +274,7 @@ public class BlocCentral {
 								e.printStackTrace();
 							}
 							if (codeRecu == VALEURPERSONNECHOISIE) {
+								// Si valeur meilleure, affectation de la valeur et du robot
 								if ((xRecu < p.getValeur()) || (p.getValeur() == -1)) {
 									p.setValeur(new Integer(xRecu));
 									p.setRobot(r);
@@ -291,7 +288,7 @@ public class BlocCentral {
 		}
 
 		// Envoi du meilleur choix de chaque robot
-		this.triBulleOptimise(this.personnesASauver);
+		this.triBulle(this.personnesASauver);
 		for (Robot r : robotsConnectes) {
 			Personne pp = null;
 			for (Personne p : personnesASauver) {
@@ -306,25 +303,27 @@ public class BlocCentral {
 		
 		// Thread de reception/envoi pour chaque robot
 		for (Robot r : robotsConnectes) {
-			threads.add(new ThreadReceptionRobot(this, r));
+			threads.add(new ThreadReceptionBlocCentral(this, r));
 		}
 		// Demarrage des threads une fois que tous les autres threads sont créés
 		// pour éviter d'envoyer des données a un thread non encore créé
-		for (ThreadReceptionRobot t  : threads) {
+		for (ThreadReceptionBlocCentral t  : threads) {
 			t.setDaemon(true);
 			t.start();
 			t.demarrer();
 		}
 		
-		// Appui quand tout est fini
+		// Attente, quand tout est fini, on peut appuyer sur le bouton
 		LCD.clear();
 		LCD.drawString("Appuyer pour deconnecter", 0, 0);
 		Button.waitForAnyPress();
 		
-		for (ThreadReceptionRobot t : threads) {
+		// Arret des threads
+		for (ThreadReceptionBlocCentral t : threads) {
 			t.arreter();
 		}
 		
+		// Deconnexion des robots
 		for (Robot r : robotsConnectes) {
 			r.disconnect();
 		}

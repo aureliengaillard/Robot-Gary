@@ -1,14 +1,14 @@
 package blocCentral;
 
-public class Personne implements Comparable<Personne> {
+public class Personne {
 	// Position de la personne
 	private int x;
 	private int y;
 	
-	// Valeur pour sauvetage
+	// Valeur pour sauvetage (heuristique la plus faible parmis les robots)
 	private int valeur;
 	
-	// Robot associé a la valeur
+	// Robot associé a la valeur (robot le plus proche / meilleure heuristique
 	private Robot robot;
 	
 	// Constructeur
@@ -19,6 +19,7 @@ public class Personne implements Comparable<Personne> {
 		this.robot = null;	
 	}
 	
+	// Getters & setters
 	public int getX() {
 		return this.x;
 	}
@@ -42,11 +43,9 @@ public class Personne implements Comparable<Personne> {
 	public void setRobot(Robot robot) {
 		this.robot = robot;
 	}
-
-	public int compareTo(Personne p) {
-		return this.valeur - p.valeur;
-	}
 	
+	// Outil de comparaison
+	// On utilise pas les mécanismes Java standards, incompatibles Lejos
 	public boolean superiorTo(Personne p) {
 		return (this.valeur > p.getValeur());
 	}

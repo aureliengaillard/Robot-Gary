@@ -1,13 +1,12 @@
 package mains;
 
 import blocCentral.BlocCentral;
-import lejos.nxt.Button;
 
 public class MainBlocCentral {
 
+	// Fonction Main executée par le bloc central
 	public static void main(String[] args) {
 		BlocCentral bc = new BlocCentral();
 		bc.run();
-		Button.waitForAnyPress();
 	}
 }

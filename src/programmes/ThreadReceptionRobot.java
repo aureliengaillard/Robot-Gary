@@ -1,24 +1,31 @@
 package programmes;
 
 import java.io.IOException;
-
-import lejos.nxt.LCD;
 import lejos.util.Delay;
 
-public class ThreadReception extends Thread {
-	// Robot d'origine
+public class ThreadReceptionRobot extends Thread {
+	// Robot à qui appartient le thread
 	private Parcourer robot;
 
-	// Flag d'arret
+	// Flag d'arret des traitements du thread
 	private volatile boolean continueThread = false;
 
 	// Constructeur
-	public ThreadReception(Parcourer robot) {
+	public ThreadReceptionRobot(Parcourer robot) {
 		this.robot = robot;
 	}
 	
+	// Arret des traitements du thread
+	public void arreter() {
+		this.continueThread = false;
+	}
+
+	// Demarrage des traitements du thread
+	public void demarrer() {
+		this.continueThread = true;
+	}
+	
 	// Codes Bluetooth
-	private static final int PERSONNE = 3;
 	private static final int MURNORD = 8;
 	private static final int MURSUD = 9;
 	private static final int MUROUEST = 10;
@@ -29,12 +36,17 @@ public class ThreadReception extends Thread {
 	private static final int NOK = 15;
 	private static final int FIN = 16;
 
+	// Fonction de traitement executée en parallèle
 	public void run() {
+		// Données reçues initialisées à -1
 		int codeRecu = -1;
 		int xRecu = -1;
 		int yRecu = -1;
+		// Boucle de reception infinie
 		while (true) {
+			// Traitement uniquement si flag = true
 			if (continueThread) {
+				// Reception des données
 				try {
 					codeRecu = robot.getIn().readInt();
 					xRecu = robot.getIn().readInt();
@@ -42,7 +54,9 @@ public class ThreadReception extends Thread {
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
+				// Traitement différent selon le code reçu
 				switch (codeRecu) {
+				// Si code Mur : Mise à jour de la grille et on dit aux robots de recalculer leurs chmins
 					case MURNORD : {
 						this.robot.getSemGrille().acquire();
 						this.robot.murNord(xRecu, yRecu);
@@ -75,6 +89,7 @@ public class ThreadReception extends Thread {
 						this.robot.setRecalcul(true);
 						break;
 					}
+					// Mise à jour de la liste des positions des autres robots
 					case POSITION : {
 						this.robot.getAutresRobots().add(this.robot.getGrille().getCase(xRecu, yRecu));
 						break;
@@ -83,6 +98,7 @@ public class ThreadReception extends Thread {
 						this.robot.getAutresRobots().remove(this.robot.getGrille().getCase(xRecu, yRecu));
 						break;
 					}
+					// Réponses du bloc central lors du choix des personnes à sauver
 					case OK : {
 						this.robot.setOk(true);
 						break;
@@ -91,6 +107,7 @@ public class ThreadReception extends Thread {
 						this.robot.setNok(true);
 						break;
 					}
+					// Fin des sauvetage, on indique au robot qu'il peut retourner dans un coin
 					case FIN : {
 						this.robot.setContinuer(false);
 						break;
@@ -102,13 +119,5 @@ public class ThreadReception extends Thread {
 			}
 			Delay.msDelay(200);
 		}
-	}
-
-	public void arreter() {
-		this.continueThread = false;
-	}
-
-	public void demarrer() {
-		this.continueThread = true;
 	}
 }

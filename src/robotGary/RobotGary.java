@@ -30,7 +30,7 @@ public class RobotGary implements RobotInterface {
 	private DifferentialPilot pilote = new DifferentialPilot(56, 105, motorG, motorD);
 
 	// Valeur de la vitesse des moteurs par défaut choisie
-	private static final int vitesseParDefautRotation = 280; // 210
+	private static final int vitesseParDefautRotation = 280;
 	private static final int vitesseParDefautTete = 700;
 	private static final int vitesseParDefaut = 340;
 
@@ -39,7 +39,7 @@ public class RobotGary implements RobotInterface {
 	private static final int seuilDetectionCotes = 30;
 	
 	// Valeur seuil pour différencier le noir et le blanc
-	private static final int valeurSeuilGauche = 487;//500;
+	private static final int valeurSeuilGauche = 487;
 	private static final int valeurSeuilDroit = 487;
 
 	public RobotGary() {
@@ -49,23 +49,6 @@ public class RobotGary implements RobotInterface {
 		this.pilote.setRotateSpeed(vitesseParDefautRotation);
 		this.pilote.setRotateSpeed(vitesseParDefautRotation);
 		this.pilote.setTravelSpeed(vitesseParDefaut);
-	}
-
-	// Accesseurs
-	public NXTRegulatedMotor getMotorG() {
-		return motorG;
-	}
-
-	public NXTRegulatedMotor getMotorD() {
-		return motorD;
-	}
-
-	public LightSensor getLightG() {
-		return lightG;
-	}
-
-	public LightSensor getLightD() {
-		return lightD;
 	}
 
 	@Override
@@ -88,7 +71,7 @@ public class RobotGary implements RobotInterface {
 		long delai = stop - start;
 		pilote.stop();
 		if (delai > 15) {
-			second.rotate((int) (delai / 1.4));
+			second.rotate((int) (delai / 1.3));
 		}
 		pilote.travel(240);
 	}
@@ -156,5 +139,4 @@ public class RobotGary implements RobotInterface {
 			LCD.clear(2);
 		return (ret < seuilDetectionCotes);
 	}
-
 }

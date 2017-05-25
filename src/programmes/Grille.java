@@ -7,11 +7,11 @@ import lejos.nxt.LCD;
 import programmes.Case;
 
 public class Grille {
-	// Dimensions
+	// Dimensions de la grille
 	private int x;
 	private int y;
 
-	// Grille
+	// Grille : tableau 2 dimensions de Case
 	private Case grille[][];
 
 	// Constructeur
@@ -19,11 +19,13 @@ public class Grille {
 		this.x = x;
 		this.y = y;
 		this.grille = new Case[x][y];
+		// Initialisation des Cases
 		for (int i = 0; i < x; i++) {
 			for (int j = 0; j < y; j++) {
 				grille[i][j] = new Case(i, j);
 			}
 		}
+		// Initialisation des références vers les cases voisines, pour chaque case de la grille
 		for (int i = 0; i < x; i++) {
 			for (int j = 0; j < y; j++) {
 				grille[i][j].setNord(this.getNord(i, j));
@@ -49,6 +51,7 @@ public class Grille {
 	}
 
 	// Obtenir les voisins d'une Case
+	// Si voisin inexistant (Bords de la grille), renvoie null
 	public Case getNord(int x, int y) {
 		if (y != 0) {
 			return grille[x][y - 1];
@@ -81,7 +84,7 @@ public class Grille {
 		}
 	}
 
-	// Remise a 0 de la grille (couts g, h et previous)
+	// Remise a 0 de la grille dans le A* (couts g, h et previous)
 	public void reset() {
 		for (int i = 0; i < x; i++) {
 			for (int j = 0; j < y; j++) {
@@ -92,7 +95,12 @@ public class Grille {
 		}
 	}
 
-	// Methodes internes pour A*
+	//// Methodes internes pour A*
+	
+	// Cout F le plus bas dans les Cases de la liste Open
+	// (F = G + H)
+	// (G = Cout du parcours deja effectué jusqu'à la case)
+	// (H = Cout estimé par l'heuristique pour aller à la cas but)
 	private Case lowestFInOpen(LinkedList<Case> openList) {
 		Case ret = openList.get(0);
 		for (Case it : openList) {
@@ -103,10 +111,14 @@ public class Grille {
 		return ret;
 	}
 
+	// Retourne la valeur de l'Heuristique choisie pour aller de la case Depart à la case Arrivée
+	// Ici, l'heuristique choisie est la distance de Manhattan (ou distance "City Block")
 	private int heuristique(Case depart, Case arrivee) {
 		return (Math.abs(depart.getX() - arrivee.getX()) + Math.abs(depart.getY() - arrivee.getY()));
 	}
 
+	// Retourne la liste des cases adjacentes à la case courrante
+	// Si les cases adjacentes sont dans la liste Closed, on ne les retourne pas
 	private List<Case> getAdjacent(Case current, List<Case> closedList) {
 		List<Case> ret = new LinkedList<Case>();
 		if (current.getNord() != null) {
@@ -132,6 +144,7 @@ public class Grille {
 		return ret;
 	}
 
+	// Une fois le A* effectué, on parcours le labyrinthe de la fin au début (via les cases previous) pour obtenir le chemin le plus court)
 	private List<Case> calcPath(Case depart, Case arrivee) {
 		List<Case> ret = new LinkedList<Case>();
 		ret.add(arrivee);
@@ -141,7 +154,7 @@ public class Grille {
 		return ret;
 	}
 
-	// Plus court chemin
+	// Plus court chemin : A*
 	public List<Case> aEtoile(int oldX, int oldY, int newX, int newY) {
 		LinkedList<Case> openList = new LinkedList<Case>();
 		LinkedList<Case> closedList = new LinkedList<Case>();
@@ -185,10 +198,12 @@ public class Grille {
 		return null;
 	}
 	
+	// Meme fonction, avec des Case au lieu des coordonnées
 	public List<Case> aEtoile(Case depart, Case arrivee) {
 		return aEtoile(depart.getX(), depart.getY(), arrivee.getX(), arrivee.getY());
 	}
 	
+	// Affichage de la Grille sur l'écran de la brique NXT
 	public void afficherGrille() {
 		int largeurCase = LCD.SCREEN_WIDTH / this.x - 1;
 		int hauteurCase = LCD.SCREEN_HEIGHT / this.y - 1;
@@ -215,31 +230,6 @@ public class Grille {
 					}
 				}
 			}
-		}
-	}
-	
-	public void afficher() {
-		for (int j = 0; j < x; j++) {
-			for (int i = 0; i < y; i++) {
-				String ouest = "";
-				String nord = "";
-				String est = "";
-				String sud = "";
-				if (this.getOuest(i, j) != null) {
-					ouest = this.getOuest(i, j).toString();
-				}
-				if (this.getNord(i, j) != null) {
-					nord = this.getNord(i, j).toString();
-				}
-				if (this.getEst(i, j) != null) {
-					est = this.getEst(i, j).toString();
-				}
-				if (this.getSud(i, j) != null) {
-					sud = this.getSud(i, j).toString();
-				}
-				System.out.print("o:" + ouest + " n:" + nord + " s:" + sud + " e:" + est + "\t\t");
-			}
-			System.out.println();
 		}
 	}
 }

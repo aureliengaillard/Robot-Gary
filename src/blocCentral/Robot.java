@@ -4,21 +4,27 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import lejos.nxt.comm.BTConnection;
-import lejos.nxt.comm.NXTConnection;
 import programmes.Semaphore;
 
 public class Robot {
-	// Streams
+	// Streams de lecture et d'écriture + semaphores
 	private DataInputStream in;
-	private Semaphore semIn = new Semaphore(1);
 	private DataOutputStream out;
 	private Semaphore semOut = new Semaphore(1);
-	private NXTConnection connexion;
+	
+	// Connexion Bluetooth
+	private BTConnection connexion;
 	
 	// Constructeur
 	public Robot(DataInputStream in, DataOutputStream out, BTConnection cx) {
 		this.in = in;
 		this.out = out;
+		this.connexion = cx;
+	}
+	
+	// Getter
+	public DataInputStream getIn() {
+		return this.in;
 	}
 	
 	// Deconnexion
@@ -46,10 +52,5 @@ public class Robot {
 			e.printStackTrace();
 		}
 		semOut.release();
-	}
-	
-	// Accesseurs
-	public DataInputStream getIn() {
-		return this.in;
 	}
 }

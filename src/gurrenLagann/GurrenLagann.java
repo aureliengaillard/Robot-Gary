@@ -31,6 +31,7 @@ public class GurrenLagann implements RobotInterface {
 		pilot.stop();
 	}
 	
+	// Autre fonction de rotation
 	/*private static void rotation2(char dir, long time) {
 		if(dir == 'l')
 			pilot.rotateLeft();
